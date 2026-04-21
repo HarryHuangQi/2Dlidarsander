@@ -28,6 +28,5 @@ void UART_init(void);//复位函数输入波特率
 void tx_task(void *arg);//发送函数
 void rx_task(void *arg);//接送函数
 int sendData( const char* data);//发送函数
-void UART_write_anotc(uint8_t *data,uint8_t len);
 
 #endif /* COMPONENTS_UART_INCLUDE_UART1_H_ */

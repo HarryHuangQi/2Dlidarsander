@@ -11,16 +11,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "esp_system.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "nvs_flash.h"
-
-#include "Data_declaration.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -36,28 +29,16 @@
 
 //LD14激光雷达IP地址
 
-static void udp_ros_read_task(void *pvParameters); //ROS系统接收任务
+static int sock_pc = -1;//PC端UDP套接字
+static struct sockaddr_in dest_addr_pc;//电脑端地址
+static int sock_tcp = -1;//TCP监测套接字
 
-struct sockaddr_storage source_addr_ros; //遥控器套接字地址存储变量足以支持IPV6
-struct sockaddr_in6 dest_addr_ros; //遥控器套接字地址
-socklen_t socklen_ros = sizeof(source_addr_ros);//计算遥控器存储变量大小
-
-struct sockaddr_in dest_addr;//激光雷达套接字IP存储
-
-char rx_buffer_ros[128];//ROS系统接收缓冲区
-char addr_str_ros[128]; //ROS系统设备地址
-
-uint8_t vel_read_buf[50];  //速度控制数据接收缓冲区
-uint8_t imu_send_buf[255];  //姿态数据发送缓冲区
-
-int sock_LD14;//激光雷达套接字
-int sock_ros;//ROS系统套接字
-
-const int ROS_PORT = 8888; //机器人系统端口
-const int LD14_PORT = 5555;//LD14端口
+const int PC_PORT = 8888; //电脑端口
+const int TCP_PORT = 8888; //TCP监测端口
 
 
-bool ros_state = false; //遥控器连接状态
+bool udp_state = false; //UDP连接状态
+bool tcp_state = false; //TCP连接状态
 
 int addr_family = 2; //套接字要使用的协议簇 AF_INET
 int ip_protocol = 0; //确定套接字的协议簇和类型时这个参数为0
@@ -66,242 +47,117 @@ int ip_protocol = 0; //确定套接字的协议簇和类型时这个参数为0
 
 #define HOST_IP_ADDR CONFIG_EXAMPLE_ADDR //IP地址
 
-#define PORT 8888 //端口
-
-static const char *TAG = "example";
-static const char *payload = "Message from ESP32 ";
-
-typedef struct _RECEIVE_DATA_ //接收ros系统的数据结构体
+static void tcp_monitor_task(void *pvParameters)
 {
-	unsigned char buffer[11];
-	struct _Control_Str_
-	{
-		unsigned char Frame_Header; //1字节 帧头
-		float X_speed;	            //4字节 x轴速度
-		float Y_speed;              //4字节 y轴速度
-		float Z_speed;              //4字节 z轴速度
-		unsigned char Frame_Tail;   //1字节 帧尾
-	}Control_Str;
-}RECEIVE_DATA;
-
-
-
-RECEIVE_DATA Receive_Data;
-
-static void tcp_client_task(void *pvParameters)   //数据接收任务
-{
-    char rx_buffer[128]; //接受缓冲区
-    char host_ip[] = HOST_IP_ADDR;  //ip地址
-    int addr_family = 0;
-    int ip_protocol = 0;
+    char host_ip[] = HOST_IP_ADDR;
+    const char *heartbeat = "ESP32_TCP_MONITOR\n";
 
     while (1) {
-    	//定义IPV4  TCP通信参数
-        struct sockaddr_in dest_addr;
-        dest_addr.sin_addr.s_addr = inet_addr(host_ip);
-        dest_addr.sin_family = AF_INET;
-        dest_addr.sin_port = htons(PORT);
-        addr_family = AF_INET;
-        ip_protocol = IPPROTO_IP;
+        struct sockaddr_in dest_addr_tcp;
+        memset(&dest_addr_tcp, 0, sizeof(dest_addr_tcp));
+        dest_addr_tcp.sin_addr.s_addr = inet_addr(host_ip);
+        dest_addr_tcp.sin_family = AF_INET;
+        dest_addr_tcp.sin_port = htons(TCP_PORT);
 
-        //创建套接字
-        int sock =  socket(addr_family, SOCK_STREAM, ip_protocol);
-        if (sock < 0) {
-            ESP_LOGE(TAG, "无法创建套接字: 错误码 %d", errno);
-            break;
+        sock_tcp = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+        if (sock_tcp < 0) {
+            tcp_state = false;
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
         }
-        ESP_LOGI(TAG, "成功创建套接字 IP地址%s  端口号%d", host_ip, PORT);
 
-
-        int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+        int err = connect(sock_tcp, (struct sockaddr *)&dest_addr_tcp, sizeof(dest_addr_tcp));
         if (err != 0) {
-            ESP_LOGE(TAG, "套接字无法连接: 错误码 %d", errno);
-            break;
+            tcp_state = false;
+            shutdown(sock_tcp, 0);
+            close(sock_tcp);
+            sock_tcp = -1;
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
         }
-        ESP_LOGI(TAG, "成功连接");
+
+        tcp_state = true;
+        printf("TCP监测连接 成功, 目标IP:%s 端口:%d\n", HOST_IP_ADDR, TCP_PORT);
 
         while (1) {
-        	//发送数据
-            int err = send(sock, payload, strlen(payload), 0);
-            if (err < 0) {
-                ESP_LOGE(TAG, "发送时发生错误: 错误码 %d", errno);
+            int sent = send(sock_tcp, heartbeat, strlen(heartbeat), 0);
+            if (sent < 0) {
+                tcp_state = false;
                 break;
             }
-
-            int len = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
-            // 接收时发生错误
-            if (len < 0) {
-                ESP_LOGE(TAG, "接收失败: 错误码 %d", errno);
-                break;
-            }
-            else {// 处理收到的数据
-                rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string
-                ESP_LOGI(TAG, "接受到 %d 字节的数据 来自 %s 地址:", len, host_ip);
-                ESP_LOGI(TAG, "%s", rx_buffer); //内容
-            }
-
-            vTaskDelay(2000 / portTICK_PERIOD_MS);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
 
-        if (sock != -1) {
-            ESP_LOGE(TAG, "正在关闭套接字并重新启动...");
-            shutdown(sock, 0);
-            close(sock);
+        if (sock_tcp != -1) {
+            shutdown(sock_tcp, 0);
+            close(sock_tcp);
+            sock_tcp = -1;
         }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    vTaskDelete(NULL);
 }
 
-static void udp_ros_read_task(void *pvParameters)//ros系统DUP数据接送任务
+static void udp_socket_init(void)
 {
-    while (1) {
-        while (1) {
-            int len = recvfrom(sock_ros, rx_buffer_ros, sizeof(rx_buffer_ros) - 1, 0, (struct sockaddr *)&source_addr_ros, &socklen_ros);//接送数据
-            if (len < 0) {//数小于0就是接收错误
-            	printf("接收失败\n");
-            	break;//跳出这个while循环关闭套接字并重新启动
-            }
-            else {//如果成功接收就获取发件人的ip地址为字符串
-                inet_ntoa_r(((struct sockaddr_in *)&source_addr_ros)->sin_addr, addr_str_ros, sizeof(addr_str_ros) - 1);
-                //rc_data_decode (rx_buffer_rc);
-                //printf("收到数据\n");
-            }
-        }
-        if (sock_ros != -1) {
-        	printf("关闭套接字并重新启动\n");
-        	shutdown(sock_ros, 0);
-        	close(sock_ros);
-        }
+    if (sock_pc >= 0) {
+        shutdown(sock_pc, 0);
+        close(sock_pc);
+        sock_pc = -1;
     }
-    vTaskDelete(NULL);
-}
 
-void socket_ros_init(void){//ros系统套接字初始化
+    memset(&dest_addr_pc, 0, sizeof(dest_addr_pc));
+    dest_addr_pc.sin_addr.s_addr = inet_addr(HOST_IP_ADDR);
+    dest_addr_pc.sin_family = AF_INET;
+    dest_addr_pc.sin_port = htons(PC_PORT);
 
-	if (addr_family == AF_INET) {//IPV4
-                struct sockaddr_in *dest_addr_ip4 = (struct sockaddr_in *)&dest_addr_ros;
-	            dest_addr_ip4->sin_addr.s_addr = htonl(INADDR_ANY);//ip地址
-	            dest_addr_ip4->sin_family = AF_INET;//套接字要使用的协议簇 AF_INET = （TCP/IP – IPv4）
-                dest_addr_ip4->sin_port = htons(ROS_PORT);//端口号
-	            ip_protocol = IPPROTO_IP;
-	        }
+    addr_family = AF_INET;
+    ip_protocol = IPPROTO_IP;
 
-	        //创建套接字，创建成功后返回套接字，创建失败返回-1，错误代码则写入“errno”中
-	        sock_ros = socket(addr_family,  //套接字要使用的协议簇 AF_INET = （TCP/IP – IPv4）
-	        				SOCK_DGRAM, //套接字类型
-							ip_protocol //确定套接字的协议簇和类型时这个参数为0
-							);//创建套接字
-            if (sock_ros < 0) printf("ros系统UDP套接字创建 失败\n");
-	        else printf("ros系统UDP套接字创建 成功\n");
-
-	        int err = bind(sock_ros, (struct sockaddr *)&dest_addr_ros, sizeof(dest_addr_ros));//套接字绑定
-
-	        if (err < 0)printf("ros系统UDP套接字绑定 失败\n");
-	        else printf("ros系统DP套接字绑定 成功\n");
-
-	        printf("ros系统UDP套接字端口号：%d\n",ROS_PORT);
-}
-
-static void tcp_send_task(void *pvParameters)   //数据接收任务
-{
-    char rx_buffer[128]; //接受缓冲区
-    char host_ip[] = HOST_IP_ADDR;  //ip地址
-    int addr_family = 0;
-    int ip_protocol = 0;
-
-
-    while (1) {
-
-    	//定义IPV4  TCP通信参数
-        struct sockaddr_in dest_addr;
-        dest_addr.sin_addr.s_addr = inet_addr(host_ip);
-        dest_addr.sin_family = AF_INET;
-        dest_addr.sin_port = htons(ROS_PORT);
-        addr_family = AF_INET;
-        ip_protocol = IPPROTO_IP;
-
-        //创建套接字
-        sock_ros =  socket(addr_family, SOCK_STREAM, ip_protocol);
-        if (sock_ros < 0) printf("ROS系统TCP套接字创建 失败\n");
-        else printf("ROS系统TCP套接字创建 成功\n");
-
-        printf("成功创建套接字 IP地址%s  端口号%d \n", host_ip, ROS_PORT);
-
-
-        int err = connect(sock_ros, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
-        if (err != 0){
-            	printf("套接字连接 失败\n");
-        }else {
-            	printf("套接字连接 成功\n");
-        }
-        while (1) {
-
-            int len = recv(sock_ros, Receive_Data.buffer, sizeof(Receive_Data.buffer) - 1, pdMS_TO_TICKS(1));
-
-            printf("%d  \n",len);
-            // 接收时发生错误
-            if (len < 0) {
-            	break;
-            }
-            vTaskDelay(1 / portTICK_PERIOD_MS);
-        }
-        if (sock_ros != -1) {
-        	printf("正在关闭套接字并重新启动...\n");
-            shutdown(sock_ros, 0);
-            close(sock_ros);
-            vTaskDelay(1 / portTICK_PERIOD_MS);
-        }
+    sock_pc = socket(addr_family, SOCK_DGRAM, ip_protocol);
+    if (sock_pc < 0) {
+        printf("UDP套接字创建 失败\n");
+        udp_state = false;
+        return;
     }
-    vTaskDelete(NULL);
+
+    udp_state = true;
+    printf("UDP套接字创建 成功, 目标IP:%s 端口:%d\n", HOST_IP_ADDR, PC_PORT);
 }
-
-void socket_LD14_init(void){
-
-
-    dest_addr.sin_addr.s_addr = inet_addr(HOST_IP_ADDR); //ip地址
-    dest_addr.sin_family = AF_INET;//套接字要使用的协议簇 AF_INET = （TCP/IP – IPv4）
-    dest_addr.sin_port = htons(LD14_PORT); //端口号
-    addr_family = AF_INET;//套接字要使用的协议簇 AF_INET = （TCP/IP – IPv4）
-    ip_protocol = IPPROTO_IP;  //确定套接字的协议簇和类型时这个参数为0
-
-    //创建套接字，创建成功后返回套接字，创建失败返回-1，错误代码则写入“errno”中
-    sock_LD14 =  socket(addr_family,  //套接字要使用的协议簇 AF_INET = （TCP/IP – IPv4）
-    					SOCK_DGRAM, //套接字类型
-						ip_protocol //确定套接字的协议簇和类型时这个参数为0
-						);//创建套接字
-    if (sock_LD14 < 0) printf("LD14激光雷达套接字创建 失败\n");
-    else printf("LD14激光雷达套接字创建 成功\n");
-
-    printf("激光雷达UDP套接字端口号：%d\n",LD14_PORT);
-}
-
 
 void udp_write_LD14(uint8_t *data,uint8_t len){//LD14激光雷达DUP发送
-//    sendto(sock_LD14, data, len, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    if (!tcp_state) {
+        return;
+    }
+
+    if (!udp_state || sock_pc < 0) {
+        udp_socket_init();
+    }
+
+    if (!udp_state || sock_pc < 0) {
+        return;
+    }
 
     //发送数据
-    int err = send(sock_ros, data, len, 0);
-    if (err < 0) ros_state = false;//未连接ros系统
-    else ros_state = true;//已连接ros系统
+    int err = sendto(sock_pc,
+                     data,
+                     len,
+                     0,
+                     (struct sockaddr *)&dest_addr_pc,
+                     sizeof(dest_addr_pc));
+    if (err < 0) {
+        udp_state = false;//发送失败
+        udp_socket_init();//失败后立即尝试重建，下一包恢复发送
+    }
+    else udp_state = true;//发送成功
 
-}
-
-void UDP_write_ros(uint8_t *data,uint8_t len){//ros系统DUP发送
-		int err = sendto(sock_ros, data, len, 0, (struct sockaddr *)&source_addr_ros, sizeof(source_addr_ros));
-		if (err < 0) ros_state = false;//未连接ros系统
-		else ros_state = true;//已连接ros系统
 }
 
 void UDP_init(void){//UDP通信初始化
 
 	printf("*******************UDP初始化开始*******************\n");
 
-	//socket_LD14_init(); //创建LD14激光雷达的套接字
-    //xTaskCreate(udp_ros_read_task, "udp_ros_read_task", 1024*8, (void*)AF_INET, 8, NULL); //创建接收ros系统数据的任务
-
-    //xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 5, NULL);  //创建tcp接受任务
-
-	xTaskCreate(tcp_send_task, "tcp_send_task", 1024*8,(void*)AF_INET,15, NULL);  //创建发送ros系统数据的任务
+	udp_socket_init();
+    xTaskCreate(tcp_monitor_task, "tcp_monitor_task", 4096, NULL, 10, NULL);
 
 	printf("*******************UDP初始化结束*******************\n");
 

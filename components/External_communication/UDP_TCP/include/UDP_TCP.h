@@ -13,8 +13,6 @@
 #include <unistd.h>
 
 void UDP_init(void);
-void UDP_write_anotc(uint8_t *data,uint8_t len);//UDP发送
-void UDP_write_rc(uint8_t *data,uint8_t len2);
 
 void udp_write_LD14(uint8_t *data,uint8_t len);//LD14激光雷达DUP发送
 
