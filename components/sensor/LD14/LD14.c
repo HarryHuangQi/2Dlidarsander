@@ -191,7 +191,7 @@ void LD14_init(void){
 //	//LD14激光雷达检测
 //	printf("正在获取LD14数据并校验\n");
 //	while(err <= 5){
-//		if(YDLIDAR_X2_test() == ESP_OK) break;
+//		if(LD14_test() == ESP_OK) break;
 //		else err++;
 //		printf("第%d次重试\n",err);
 //	}
@@ -199,8 +199,8 @@ void LD14_init(void){
 //	if(err >= 5){
 //		printf("LD14初始化 失败\n");
 //	}else{
-		//xTaskCreate(LD14_data_Task, "LD14_data_Task", 4096 * 8, NULL, 15, NULL);
-		xTaskCreate(YDLIDAR_X2_data_Task, "YDLIDAR_X2_data_Task", 4096 * 8, NULL, 15, NULL);
+		xTaskCreate(LD14_data_Task, "LD14_data_Task", 4096 * 8, NULL, 15, NULL);
+		//xTaskCreate(YDLIDAR_X2_data_Task, "YDLIDAR_X2_data_Task", 4096 * 8, NULL, 15, NULL);
 //		printf("创建LD14雷达数据转发任务 LD14_data_Task \n");
 //		printf("LD14初始化 成功\n");
 //	}
