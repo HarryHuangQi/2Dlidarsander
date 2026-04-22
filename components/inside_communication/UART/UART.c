@@ -62,7 +62,7 @@ void uart_init(int baud,int UART_NUM,int TXD_PIN, int RXD_PIN) {              		
 }
 
 void UART_init(void) {
-	uart_init(115200,UART_NUM_1,19,18);  //激光雷达串口
+	uart_init(230400,UART_NUM_1,17,18);  //激光雷达串口
 }
 
 

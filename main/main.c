@@ -11,7 +11,7 @@
  * 
  * 启动顺序:
  * 1. WiFi初始化 (STA模式, 静态IP 192.168.43.105)
- * 2. UART初始化 (UART1, 115200波特率, 接收LD14数据)
+ * 2. UART初始化 (UART1, 230400波特率, 接收LD14数据)
  * 3. UDP/TCP初始化 (创建UDP socket和TCP监控任务)
  * 4. 设置init_ok标志 (为传感器任务开启数据处理)
  * 5. LD14初始化 (创建LD14_data_Task, 开始读取传感器数据)
@@ -31,7 +31,7 @@ void app_main(void)
 	/* 第2步: 初始化UART1用于LD14激光雷达 */
 	printf("=== Initializing UART1 (LD14 sensor) ===\n");
 	UART_init();
-	printf("✓ UART1 ready (115200 baud, GPIO19/GPIO18)\n\n");
+	printf("✓ UART1 ready (230400 baud, GPIO17/GPIO18)\n\n");
 
 	/* 第3步: 初始化UDP/TCP通信 */
 	printf("=== Initializing UDP/TCP communication ===\n");
