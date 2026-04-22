@@ -21,7 +21,7 @@
 
 #define CONFIG_ESP_MAXIMUM_RETRY 10
 
-#define EXAMPLE_ESP_WIFI_SSID      "BIRD 9407" //wifi名称
+#define EXAMPLE_ESP_WIFI_SSID      "qiiPhone" //wifi名称
 #define EXAMPLE_ESP_WIFI_PASS      "wssn2233"//WiFi密码
 
 //#define EXAMPLE_ESP_WIFI_SSID      "redmi" //wifi名称

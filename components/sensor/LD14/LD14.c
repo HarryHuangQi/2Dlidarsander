@@ -116,28 +116,30 @@ void LD14_data_Task(void *pvParameter)
 	while (1) {
 		if(init_ok){
 
-			const int rxBytes = uart_read_bytes(UART_NUM_1, LD14_data_buf, 47, 0);//读取串口数据
-			//printf("接收到 %d 字节 \n",rxBytes);
+			const int rxBytes = uart_read_bytes(UART_NUM_1, LD14_data_buf, 47, pdMS_TO_TICKS(20));//读取串口数据
+			if (rxBytes > 0) {
+				printf("LD14 接收到 %d 字节\n", rxBytes);
+			}
 
 
 			if (rxBytes > 0) {//如果读取到数据就进行校验
-				//printf("  接受到 %d 字节 \n",rxBytes);
-
 	            if (CalCRC8(LD14_data_buf, 46) == LD14_data_buf[46]) {//CRC校验
 //	            	LD14_radar_data.rotate_speed = LD14_data_buf[3] << 8 | LD14_data_buf[2]; //雷达转速
 //	            	LD14_radar_data.Initial_Angle = LD14_data_buf[5] << 8 | LD14_data_buf[4];//雷达起始角度
 //	            	LD14_radar_data.end_Angle = LD14_data_buf[43] << 8 | LD14_data_buf[42];  //雷达结束角度
 //	            	LD14_radar_data.timestamp = LD14_data_buf[45] << 8 | LD14_data_buf[44];  //时间戳
+	            	printf("LD14 CRC 校验成功\n");
 	            	udp_write_LD14(LD14_data_buf,47);
 	            	//printf("CRC解析 成功\n");
 	                //printf("雷达数据：转速= %d  起始角度= %d  结束角度= %d  时间戳= %d  \n",LD14_radar_data.rotate_speed,LD14_radar_data.Initial_Angle,LD14_radar_data.end_Angle,LD14_radar_data.timestamp);
 	            } else {
+	             	printf("LD14 CRC 校验失败\n");
 	              uart_flush(UART_NUM_1);
 	              //printf("CRC解析 失败\n");
 	            }
 	       }
 	   }
-			vTaskDelay(1 / portTICK_PERIOD_MS); //读取后释放1个周期给看门狗复位
+			vTaskDelay(pdMS_TO_TICKS(5)); //给调度器和看门狗留出时间
 	}
 }
 
