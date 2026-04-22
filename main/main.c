@@ -23,10 +23,13 @@
  */
 void app_main(void)
 {
-	/* 第1步: 初始化WiFi (STA模式, 阻塞直到连接成功) */
+	/* 第1步: 初始化WiFi (STA模式, 阻塞直到连接成功或失败) */
 	printf("=== Initializing WiFi (STA mode) ===\n");
-	wifi_init_sta();
-	printf("✓ WiFi connected!\n\n");
+	if (wifi_init_sta()) {
+		printf("✓ WiFi connected!\n\n");
+	} else {
+		printf("✗ WiFi connect failed!\n\n");
+	}
 
 	/* 第2步: 初始化UART1用于LD14激光雷达 */
 	printf("=== Initializing UART1 (LD14 sensor) ===\n");

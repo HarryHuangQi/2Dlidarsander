@@ -137,13 +137,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
         example_set_static_ip(arg);
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < 5) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
-        } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }
+        esp_wifi_connect();
+        s_retry_num++;
+        ESP_LOGI(TAG, "retry to connect to the AP (%d)", s_retry_num);
         ESP_LOGI(TAG,"connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
@@ -175,7 +171,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 //    }
 //}
 
-void wifi_init_sta(void)
+bool wifi_init_sta(void)
 {
 	printf("\n\n********************WiFi初始化开始********************\n");
 
@@ -266,9 +262,9 @@ void wifi_init_sta(void)
 
     /* 等待连接建立(WIFI_CONNECTED_BIT)或最大连接失败
      *重试次数(WIFI_FAIL_BIT)。位由event_handler()(见上文)设置*/
-    printf("正在连接WiFi....\n");
+    printf("正在连接WiFi(将持续重试直到成功)....\n");
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            							   WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+               						   WIFI_CONNECTED_BIT,
 										   pdFALSE,
 										   pdFALSE,
 										   portMAX_DELAY);
@@ -276,14 +272,15 @@ void wifi_init_sta(void)
     /* xEventGroupWaitBits()返回返回调用之前的位，因此我们可以测试实际是哪个事件
      *发生*/
 
+    bool wifi_connected = false;
     if (bits & WIFI_CONNECTED_BIT) {
     	printf("WIFI连接 成功\n");
-    } else if (bits & WIFI_FAIL_BIT) {
-    	printf("WIFI连接 失败\n");
+        wifi_connected = true;
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
         printf("其他错误导致 失败\n");
     }
     printf("\n********************WiFi初始化结束********************\n\n");
+    return wifi_connected;
 }
 

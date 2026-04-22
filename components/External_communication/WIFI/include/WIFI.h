@@ -8,8 +8,8 @@
 #ifndef COMPONENTS_EXTERNAL_COMMUNICATION_WIFI_INCLUDE_WIFI_H_
 #define COMPONENTS_EXTERNAL_COMMUNICATION_WIFI_INCLUDE_WIFI_H_
 
+#include <stdbool.h>
 
-
-void wifi_init_sta(void);
+bool wifi_init_sta(void);
 
 #endif /* COMPONENTS_EXTERNAL_COMMUNICATION_WIFI_INCLUDE_WIFI_H_ */

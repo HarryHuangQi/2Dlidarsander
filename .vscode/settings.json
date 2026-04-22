@@ -12,5 +12,7 @@
     "--background-index",
     "--query-driver=**",
     "--compile-commands-dir=c:\\Users\\ASUS\\car\\build"
-  ]
+  ],
+  "idf.flashType": "UART",
+  "idf.portWin": "COM5"
 }
