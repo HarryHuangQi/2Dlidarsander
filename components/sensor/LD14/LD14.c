@@ -113,10 +113,13 @@ int YDLIDAR_X2_test(void){ //YDLIDAR X2激光雷达检测
 
 void LD14_data_Task(void *pvParameter)
 {
+	TickType_t last_status_tick = xTaskGetTickCount();
+	int last_rx_bytes = 0;
 	while (1) {
 		if(init_ok){
 
 			const int rxBytes = uart_read_bytes(UART_NUM_1, LD14_data_buf, 47, pdMS_TO_TICKS(20));//读取串口数据
+			last_rx_bytes = rxBytes;
 			if (rxBytes > 0) {
 				printf("LD14 接收到 %d 字节\n", rxBytes);
 			}
@@ -139,6 +142,11 @@ void LD14_data_Task(void *pvParameter)
 	            }
 	       }
 	   }
+			TickType_t now_tick = xTaskGetTickCount();
+			if ((now_tick - last_status_tick) >= pdMS_TO_TICKS(1000)) {
+				printf("LD14 任务运行中，最近一次读取字节数: %d\n", last_rx_bytes);
+				last_status_tick = now_tick;
+			}
 			vTaskDelay(pdMS_TO_TICKS(5)); //给调度器和看门狗留出时间
 	}
 }
