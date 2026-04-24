@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -69,6 +70,7 @@ static void tcp_monitor_task(void *pvParameters)
         int err = connect(sock_tcp, (struct sockaddr *)&dest_addr_tcp, sizeof(dest_addr_tcp));
         if (err != 0) {
             tcp_state = false;
+            printf("TCP监测连接 失败, errno=%d\n", errno);
             shutdown(sock_tcp, 0);
             close(sock_tcp);
             sock_tcp = -1;
@@ -83,6 +85,7 @@ static void tcp_monitor_task(void *pvParameters)
             int sent = send(sock_tcp, heartbeat, strlen(heartbeat), 0);
             if (sent < 0) {
                 tcp_state = false;
+                printf("TCP心跳发送 失败, errno=%d\n", errno);
                 break;
             }
             vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -125,7 +128,7 @@ static void udp_socket_init(void)
 }
 
 void udp_write_LD14(uint8_t *data,uint8_t len){//LD14激光雷达DUP发送
-    if (!tcp_state) {
+    if (data == NULL || len == 0) {
         return;
     }
 
@@ -146,6 +149,7 @@ void udp_write_LD14(uint8_t *data,uint8_t len){//LD14激光雷达DUP发送
                      sizeof(dest_addr_pc));
     if (err < 0) {
         udp_state = false;//发送失败
+        printf("UDP发送 失败, errno=%d\n", errno);
         udp_socket_init();//失败后立即尝试重建，下一包恢复发送
     }
     else udp_state = true;//发送成功
