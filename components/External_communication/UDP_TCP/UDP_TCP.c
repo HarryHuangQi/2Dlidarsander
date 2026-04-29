@@ -44,7 +44,7 @@ bool tcp_state = false; //TCP连接状态
 int addr_family = 2; //套接字要使用的协议簇 AF_INET
 int ip_protocol = 0; //确定套接字的协议簇和类型时这个参数为0
 
-#define CONFIG_EXAMPLE_ADDR "192.168.43.250"
+#define CONFIG_EXAMPLE_ADDR "10.42.0.1"
 
 #define HOST_IP_ADDR CONFIG_EXAMPLE_ADDR //IP地址
 
