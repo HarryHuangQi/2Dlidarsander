@@ -14,6 +14,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include "esp_system.h"
+#include "esp_timer.h"
 
 #include "Data_declaration.h" //数据声明头文件
 
@@ -120,18 +121,22 @@ void LD14_data_Task(void *pvParameter)
 
 			const int rxBytes = uart_read_bytes(UART_NUM_1, LD14_data_buf, 47, pdMS_TO_TICKS(20));//读取串口数据
 			last_rx_bytes = rxBytes;
-			if (rxBytes > 0) {
+			if (rxBytes == 47) {
 				printf("LD14 接收到 %d 字节\n", rxBytes);
 			}
 
 
-			if (rxBytes > 0) {//如果读取到数据就进行校验
+			if (rxBytes == 47) {//如果读取到完整47字节帧就进行校验
 	            if (CalCRC8(LD14_data_buf, 46) == LD14_data_buf[46]) {//CRC校验
 //	            	LD14_radar_data.rotate_speed = LD14_data_buf[3] << 8 | LD14_data_buf[2]; //雷达转速
 //	            	LD14_radar_data.Initial_Angle = LD14_data_buf[5] << 8 | LD14_data_buf[4];//雷达起始角度
 //	            	LD14_radar_data.end_Angle = LD14_data_buf[43] << 8 | LD14_data_buf[42];  //雷达结束角度
 //	            	LD14_radar_data.timestamp = LD14_data_buf[45] << 8 | LD14_data_buf[44];  //时间戳
 	            	printf("LD14 CRC 校验成功\n");
+	            	uint64_t ts_us = esp_timer_get_time();
+	            	char ts_msg[64];
+	            	snprintf(ts_msg, sizeof(ts_msg), "LD14_TS:%llu\n", ts_us);
+	            	udp_write_LD14((uint8_t *)ts_msg, (uint8_t)strlen(ts_msg));
 	            	udp_write_LD14(LD14_data_buf,47);
 	            	//printf("CRC解析 成功\n");
 	                //printf("雷达数据：转速= %d  起始角度= %d  结束角度= %d  时间戳= %d  \n",LD14_radar_data.rotate_speed,LD14_radar_data.Initial_Angle,LD14_radar_data.end_Angle,LD14_radar_data.timestamp);
@@ -177,6 +182,10 @@ void YDLIDAR_X2_data_Task(void *pvParameter)
 //	            	LD14_radar_data.Initial_Angle = LD14_data_buf[5] << 8 | LD14_data_buf[4];//雷达起始角度
 //	            	LD14_radar_data.end_Angle = LD14_data_buf[43] << 8 | LD14_data_buf[42];  //雷达结束角度
 //	            	LD14_radar_data.timestamp = LD14_data_buf[45] << 8 | LD14_data_buf[44];  //时间戳
+	            	uint64_t ts_us = esp_timer_get_time();
+	            	char ts_msg[64];
+	            	snprintf(ts_msg, sizeof(ts_msg), "YDLIDAR_TS:%llu\n", ts_us);
+	            	udp_write_LD14((uint8_t *)ts_msg, (uint8_t)strlen(ts_msg));
 	            	udp_write_LD14(YDLIDAR_X2_data_buf,rxBytes);
 	            //	/printf("解析 成功\n");
 	                //printf("雷达数据：转速= %d  起始角度= %d  结束角度= %d  时间戳= %d  \n",LD14_radar_data.rotate_speed,LD14_radar_data.Initial_Angle,LD14_radar_data.end_Angle,LD14_radar_data.timestamp);

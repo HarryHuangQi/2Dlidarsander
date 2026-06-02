@@ -11,9 +11,11 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <stdint.h>
 
 void UDP_init(void);
 
 void udp_write_LD14(uint8_t *data,uint8_t len);//LD14激光雷达DUP发送
+void udp_write_IMU(uint8_t *data, uint8_t len);//IMU单独UDP发送
 
 #endif /* COMPONENTS_EXTERNAL_COMMUNICATION_UDP_TCP_INCLUDE_UDP_TCP_H_ */

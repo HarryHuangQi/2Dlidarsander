@@ -32,9 +32,12 @@
 
 static int sock_pc = -1;//PC端UDP套接字
 static struct sockaddr_in dest_addr_pc;//电脑端地址
+static int sock_imu = -1;//IMU端UDP套接字
+static struct sockaddr_in dest_addr_imu;//IMU电脑端地址
 static int sock_tcp = -1;//TCP监测套接字
 
 const int PC_PORT = 8888; //电脑端口
+const int IMU_PORT = 8889; //IMU电脑端口
 const int TCP_PORT = 8888; //TCP监测端口
 
 
@@ -127,6 +130,31 @@ static void udp_socket_init(void)
     printf("UDP套接字创建 成功, 目标IP:%s 端口:%d\n", HOST_IP_ADDR, PC_PORT);
 }
 
+static void udp_socket_init_imu(void)
+{
+    if (sock_imu >= 0) {
+        shutdown(sock_imu, 0);
+        close(sock_imu);
+        sock_imu = -1;
+    }
+
+    memset(&dest_addr_imu, 0, sizeof(dest_addr_imu));
+    dest_addr_imu.sin_addr.s_addr = inet_addr(HOST_IP_ADDR);
+    dest_addr_imu.sin_family = AF_INET;
+    dest_addr_imu.sin_port = htons(IMU_PORT);
+
+    addr_family = AF_INET;
+    ip_protocol = IPPROTO_IP;
+
+    sock_imu = socket(addr_family, SOCK_DGRAM, ip_protocol);
+    if (sock_imu < 0) {
+        printf("IMU UDP套接字创建 失败\n");
+        return;
+    }
+
+    printf("IMU UDP套接字创建 成功, 目标IP:%s 端口:%d\n", HOST_IP_ADDR, IMU_PORT);
+}
+
 void udp_write_LD14(uint8_t *data,uint8_t len){//LD14激光雷达DUP发送
     if (data == NULL || len == 0) {
         return;
@@ -156,11 +184,42 @@ void udp_write_LD14(uint8_t *data,uint8_t len){//LD14激光雷达DUP发送
 
 }
 
+void udp_write_IMU(uint8_t *data, uint8_t len)
+{
+    if (data == NULL || len == 0) {
+        return;
+    }
+
+    if (sock_imu < 0) {
+        udp_socket_init_imu();
+    }
+
+    if (sock_imu < 0) {
+        return;
+    }
+
+    int err = sendto(sock_imu,
+                     data,
+                     len,
+                     0,
+                     (struct sockaddr *)&dest_addr_imu,
+                     sizeof(dest_addr_imu));
+    if (err < 0) {
+        printf("IMU UDP发送 失败, errno=%d\n", errno);
+        if (sock_imu >= 0) {
+            shutdown(sock_imu, 0);
+            close(sock_imu);
+            sock_imu = -1;
+        }
+    }
+}
+
 void UDP_init(void){//UDP通信初始化
 
 	printf("*******************UDP初始化开始*******************\n");
 
 	udp_socket_init();
+    udp_socket_init_imu();
     xTaskCreate(tcp_monitor_task, "tcp_monitor_task", 4096, NULL, 10, NULL);
 
 	printf("*******************UDP初始化结束*******************\n");
