@@ -21,14 +21,12 @@
 
 #define CONFIG_ESP_MAXIMUM_RETRY 10
 
-#define EXAMPLE_ESP_WIFI_SSID      "qiiPhone" //wifi名称
-#define EXAMPLE_ESP_WIFI_PASS      "wssn2233"//WiFi密码
-
-//#define EXAMPLE_ESP_WIFI_SSID      "redmi" //wifi名称
-//#define EXAMPLE_ESP_WIFI_PASS      "1234567890"//WiFi密码
-
-//#define EXAMPLE_ESP_WIFI_SSID      "xiaomi" //wifi名称
-//#define EXAMPLE_ESP_WIFI_PASS      "12345678"//WiFi密码
+#ifndef EXAMPLE_ESP_WIFI_SSID
+#define EXAMPLE_ESP_WIFI_SSID      "YOUR_WIFI_SSID" //wifi名称占位符
+#endif
+#ifndef EXAMPLE_ESP_WIFI_PASS
+#define EXAMPLE_ESP_WIFI_PASS      "YOUR_WIFI_PASSWORD" //WiFi密码占位符
+#endif
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY//最大重试次数5
 
@@ -251,7 +249,7 @@ bool wifi_init_sta(void)
     else printf("失败\n");
 
     printf("WiFi名称:%s\n",EXAMPLE_ESP_WIFI_SSID);
-    printf("WiFi密码:%s\n",EXAMPLE_ESP_WIFI_PASS);
+    printf("WiFi密码:[masked]\n");
 
     //根据当前配置启动WiFi 如果模式WIFI_MODE_STA，则创建站控制块并启动站
     printf("根据当前配置启动WiFi和创建站控制块并启动站\n");
